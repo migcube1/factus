@@ -45,4 +45,11 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+
+    //Relacion uno a uno
+    public function accessToken()
+    {
+        return $this->hasOne(AccessToken::class);
+    }
 }

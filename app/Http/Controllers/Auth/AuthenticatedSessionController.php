@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Traits\Token;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,7 @@ use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
+    use Token;
     /**
      * Display the login view.
      */
@@ -27,6 +29,14 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+
+        //Verificamos el token del usuario.
+        $user  = auth()->user();
+
+        if (!$user->accessToken) {
+            $data = $this->getAccessToken($user);
+            $this->createAccessToken($data, $user);
+        }
 
         return redirect()->intended(route('dashboard', absolute: false));
     }
