@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\FactusController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,4 +18,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
+
+Route::controller(FactusController::class)->group(function () {
+    Route::get('factus', 'index')->name('factus.index');
+})->middleware('auth');
