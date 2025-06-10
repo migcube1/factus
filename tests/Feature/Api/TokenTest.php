@@ -24,7 +24,6 @@ class TokenTest extends TestCase
 
         $test_refresh_token = Str::random(40);
 
-        // Act
         Http::fake([
             config('api.url') . '/oauth/token' => Http::response([
                 'access_token' =>  $test_access_token,
@@ -33,6 +32,7 @@ class TokenTest extends TestCase
             ], 200),
         ]);
 
+        // Act
         $data = $service->getAccessToken($user);
 
         // Assert
@@ -41,6 +41,106 @@ class TokenTest extends TestCase
         $this->assertDatabaseHas('access_tokens', [
             'user_id' => $user->id,
             'access_token' =>  $test_access_token,
+        ]);
+    }
+
+    public function test_can_resolve_authorization_if_token_not_expired()
+    {
+        // Arrange
+        $service = new AuthService();
+
+        $user = User::factory()->create();
+
+        $valid_token = Str::random(40);
+
+        $user->accessToken()->create([
+            'service_id' => Str::uuid(),
+            'access_token' =>  $valid_token,
+            'refresh_token' => Str::random(40),
+            'expires_at' => now()->addSecond(3600),
+        ]);
+
+        // Act
+        $token = $service->resolveAuthorization($user);
+
+        // Assert
+        $this->assertEquals($valid_token, $token);
+    }
+
+
+    public function test_can_resolve_authorization_if_token_expired()
+    {
+        // Arrange
+        $service = new AuthService();
+
+        $user = User::factory()->create();
+
+        $expired_access_token = Str::random(40);
+
+        $user->accessToken()->create([
+            'service_id' => Str::uuid(),
+            'access_token' =>  $expired_access_token,
+            'refresh_token' =>  Str::random(40),
+            'expires_at' => now()->subMinutes(5),
+        ]);
+
+        $new_access_token = Str::random(40);
+
+        Http::fake([
+            config('api.url') . '/oauth/token' => Http::response([
+                'access_token' =>  $new_access_token,
+                'refresh_token' => Str::random(40),
+                'expires_in' => 3600,
+            ], 200),
+        ]);
+
+        // Act
+        $new_token = $service->resolveAuthorization($user);
+
+        // Assert
+        $this->assertEquals($new_access_token, $new_token);
+
+        $this->assertDatabaseHas('access_tokens', [
+            'user_id' => $user->id,
+            'access_token' => $new_access_token,
+        ]);
+    }
+
+
+    public function test_can_resolve_authorization_if_token_cannot_refresh()
+    {
+        // Arrange
+        $service = new AuthService();
+
+        $user = User::factory()->create();
+
+        $access_token = Str::random(40);
+
+        $user->accessToken()->create([
+            'service_id' => Str::uuid(),
+            'access_token' =>  $access_token,
+            'refresh_token' =>  Str::random(40),
+            'expires_at' => now()->subMinutes(5),
+        ]);
+
+        Http::fake([
+            config('api.url') . '/oauth/token' => Http::response([
+                "error" => "invalid_request",
+                "error_description" => "The refresh token is invalid.",
+                "hint" => "Token has been revoked",
+                "message" => "The refresh token is invalid."
+            ], 401),
+        ]);
+
+        // Act
+        $response = $service->resolveAuthorization($user);
+
+        // Assert
+        $this->assertEquals(401, $response->getStatusCode());
+
+        $this->assertDatabaseMissing('access_tokens', [
+            'user_id' => $user->id,
+            'access_token' =>  $access_token,
         ]);
     }
 }
