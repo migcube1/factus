@@ -5,38 +5,23 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CustomerTax;
 use App\Models\TypeIdentityDocument;
-use App\Traits\Token;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use App\Services\Api\AuthService;
+use App\Services\Api\BillService;
 
 
 class FactusController extends Controller
 {
-
-    use Token;
+    public function __construct(
+        protected BillService $billService,
+        protected AuthService $authService
+    ) {}
 
     public function index()
     {
-        $this->resolveAuthorization();
+        $access_token = $this->authService
+            ->resolveAuthorization($this->getAuthUser());
 
-        $url = config('api.url');
-
-        //Obtener access token
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'Authorization' => 'Bearer ' . $this->user->accessToken->access_token
-        ])->get($url . "/v1/bills");
-
-        if (!$response->successful()) {
-            return response()->json([
-                'error' => 'Ocurrió un error.',
-                'message' => $response->body(),
-            ], 400);
-        }
-
-        $data = $response->json();
-
+        $data = $this->billService->getBills($access_token);
 
         return view('factus.index', [
             'invoices' => $data['data']['data'],

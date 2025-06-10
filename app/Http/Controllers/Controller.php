@@ -10,4 +10,9 @@ abstract class Controller
     {
         $this->user = auth()->user();
     }
+
+    public function getAuthUser()
+    {
+        return auth()->user();
+    }
 }

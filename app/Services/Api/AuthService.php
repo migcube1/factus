@@ -1,18 +1,29 @@
 <?php
 
-namespace App\Traits;
+namespace App\Services\Api;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-trait Token
+
+
+class AuthService
 {
+
+    protected $url;
+
+
+    public function __construct()
+    {
+        $this->url = config('api.url');
+    }
+
+
     public function getAccessToken($user)
     {
-        $url = config('api.url');
 
         //Obtener access token
-        $response = Http::asForm()->post($url . '/oauth/token', [
+        $response = Http::asForm()->post($this->url . '/oauth/token', [
             'grant_type' => 'password',
             'client_id' => config('api.client_id'),
             'client_secret' => config('api.client_secret'),
@@ -24,9 +35,9 @@ trait Token
 
             // En caso de error, devolver el mensaje de error
             return response()->json([
-                'error' => 'No se pudo obtener el token',
+                'error' => 'No se pudo obtener el token.',
                 'message' => $response->body(),
-            ], 400);
+            ], 401);
         }
 
         $data = $response->json();
@@ -36,20 +47,19 @@ trait Token
         return $data;
     }
 
-    public function resolveAuthorization()
+    public function resolveAuthorization($user)
     {
-        $user = auth()->user();
-
         if (!$user->accessToken || $user->accessToken->expires_at <=  now()) {
-            $url = config('api.url');
+
 
             //Obtener access token
-            $response = Http::asForm()->post($url . '/oauth/token', [
-                'grant_type' => 'refresh_token',
-                'client_id' => config('api.client_id'),
-                'client_secret' => config('api.client_secret'),
-                'refresh_token' => $user->accessToken->refresh_token,
-            ]);
+            $response = Http::asForm()
+                ->post($this->url . '/oauth/token', [
+                    'grant_type' => 'refresh_token',
+                    'client_id' => config('api.client_id'),
+                    'client_secret' => config('api.client_secret'),
+                    'refresh_token' => $user->accessToken->refresh_token,
+                ]);
 
             if (!$response->successful()) {
                 $user->accessToken->delete();
@@ -78,7 +88,7 @@ trait Token
     }
 
 
-    public function createAccessToken($data, $user)
+    private function createAccessToken($data, $user)
     {
         return $user->accessToken()->create([
             'service_id' => Str::uuid(),
